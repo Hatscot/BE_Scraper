@@ -1,0 +1,6 @@
+DUBLETTEN-REPORT
+Quelldatei: D:\Entwicklung\GitHub\BE_Scraper\table\brickeconomy_sets_2026-04-06_10-20.xlsx
+Datum: 06.04.2026 11:20:31
+--------------------------------------------------
+
+Keine doppelten Einträge gefunden.
