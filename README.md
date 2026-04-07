@@ -54,7 +54,15 @@ Die Zieltabelle MUSS exakt diese Spalten in dieser Reihenfolge enthalten:
 12. **Profit (%)** (Formel: `Profit / eBay Preis`)
 
 ## ⚡ 5. Automatisierung (Google Apps Script)
-Damit die Checkboxen Zeilen verschieben können, muss der Agent folgendes Script für das Google Sheet bereitstellen:
+Beispiel Skript für Google sheets soll angepasst werden sollte die Variante nicht
+funktionieren - Stabilietät wurde noch nicht geprüft. Sollten Funktionen noch unklar sein
+Soll der Agent Fragen stellen um die beste Lösung zu finden. Das Skript soll in Google Sheets
+integriert werden und die Checkboxen sollen die Zeilen in die entsprechenden Tabellen verschieben. 
+Bei weiterm Aktueliesiern mit einer Neuen Liste soll die Liste nicht überschrieben werden sondern
+Aktualisiert werden bis auf die neuen Einträge die ins Erste Tabellenblatt sollen. Die Spalten
+Kauf, Beobachten, Löschen, Archiv sollen nicht überschrieben werden. Die Spalten Marktwert und
+Profit sollen aber Aktualisiert werden. Zudem ist wichtig anzumerken das die Checkbox Löschen nicht wirklich den ganzen eintrag löscht sondern ebenfalls zu dem Zugehörigen Tabellenblatt versiebt, damit
+soll verhindert werden das beim Erneuten Aktueliesiern die gelöschten Sets wieder auftauchen.
 
 ```javascript
 function onEdit(e) {
@@ -83,4 +91,17 @@ function onEdit(e) {
   }
 }
 
+## 6. Technische Anforderungen
+- Python (Pandas für Daten, BeautifulSoup/Playwright für Scraping).
+- Google Sheets API v4.
+- Fehlerbehandlung für "Set nicht gefunden" auf eBay
+- Proxy-Rotation fürs Scraping ein beispiel habe ich in dem Ordner scraping-ebay gelegt das zum rotating_proxies Ordner gehört, Die Speider in scraping-ebay waren darauf ausgelegt Bilder anhand einer Liste zu scrapen dies hat auch mit rotating_proxies gut funktioniert, aufpassen es sind par mehr Spider skripte dabei, 2 Davon haben nicht funktioniert.
 
+
+## 🔄 7. Intelligente Merge-Logik (Anti-Reset)
+Um zu verhindern, dass bereits bearbeitete Sets erneut im "Posteingang" landen, muss der Agent folgende Prüfung durchführen:
+
+1. **Globaler Scan:** Vor jedem Schreibvorgang müssen die Set-Nummern aus ALLEN Reitern (Kauf, Watchlist, Archiv) eingelesen werden.
+2. **Abgleich:** - Wenn eine Set-Nummer bereits in "Kauf", "Watchlist" oder "Archiv" existiert -> **Nicht** erneut in das Hauptblatt (Posteingang) schreiben.
+   - **Optional:** Nur den Preis im jeweiligen Reiter aktualisieren, aber die Zeile dort lassen, wo sie ist.
+3. **Posteingang-Bereinigung:** Sets, die im Hauptblatt verbleiben, aber beim neuen Scrape nicht mehr gefunden wurden (oder nicht mehr profitabel sind), sollten markiert oder entfernt werden, damit der Posteingang nicht "zumüllt".
