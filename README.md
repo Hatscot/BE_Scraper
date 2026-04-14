@@ -103,5 +103,17 @@ Um zu verhindern, dass bereits bearbeitete Sets erneut im "Posteingang" landen, 
 
 1. **Globaler Scan:** Vor jedem Schreibvorgang müssen die Set-Nummern aus ALLEN Reitern (Kauf, Watchlist, Archiv) eingelesen werden.
 2. **Abgleich:** - Wenn eine Set-Nummer bereits in "Kauf", "Watchlist" oder "Archiv" existiert -> **Nicht** erneut in das Hauptblatt (Posteingang) schreiben.
-   - **Optional:** Nur den Preis im jeweiligen Reiter aktualisieren, aber die Zeile dort lassen, wo sie ist.
 3. **Posteingang-Bereinigung:** Sets, die im Hauptblatt verbleiben, aber beim neuen Scrape nicht mehr gefunden wurden (oder nicht mehr profitabel sind), sollten markiert oder entfernt werden, damit der Posteingang nicht "zumüllt".
+
+## 🚀 8. Ausführung des Scrapers
+
+Um den eBay Scraper zu starten, stelle sicher, dass du dich im Hauptverzeichnis des Projekts befindest, und führe folgenden Befehl im Terminal (Powershell) aus:
+
+```powershell
+.\.venv\Scripts\python.exe EB_scrape_per_link.py
+```
+
+### Wichtige Vorabprüfungen:
+1. **Proxy_Login.json**: Prüfe, ob deine Dataimpulse-Zugangsdaten (`Login_ID`, `Password`, `Proxy_Host`, `Proxy_Port`) korrekt eingetragen sind. Ohne funktionierenden Proxy wird der Zugriff auf eBay eventuell blockiert.
+2. **Eingabedatei**: Stelle sicher, dass die in `config.py` (Variable `INPUT_FILE`) hinterlegte `.xlsx` Datei im Ordner `table/` existiert.
+3. **Ausgabe**: Nach erfolgreichem Durchlauf findest du alle neuen und profitablen Einträge in der Datei `LEGO_Ebay_Tracker_Result.xlsx` im Hauptverzeichnis. Diese kannst du anschließend in Google Sheets importieren.
