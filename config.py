@@ -64,9 +64,25 @@ BLACKLIST = [
     "Teilset",
     "LEGO Minifigur",
     "Schlüsselanhänger",
-    "Kopfbedeckung"
+    "Kopfbedeckung",
+    "Spielsteine"
+    "mit OVP",
+    "aufgebaut",
+
+
 ]
 
 # --- Google Sheets API ---
 # Falls CREATE_NEW_SHEET = False, hier die ID der vorhandenen Tabelle eintragen
 EXISTING_SHEET_ID = "DEINE_GOOGLE_SHEET_ID_HIER"
+
+# --- Kleinanzeigen-spezifische Einstellungen ---
+KA_OUTPUT_FILENAME = "LEGO_KA_Tracker_Result_02.xlsx"
+KA_ALLOWED_CURRENCIES = ["€"]
+
+# Pfad zu einer bestehenden KA-Ergebnis-Excel, die fortgeführt werden soll.
+# Leer ("") = Neue Tabelle erstellen (alle Sheets frisch anlegen)
+# Pfad gesetzt = Bestehende Datei laden, neue Ergebnisse zu "Posteingang" hinzufügen,
+#                Kauf/Watchlist/Archiv/Löschen bleiben erhalten;
+#                bereits enthaltene Sets (aus Kauf, Watchlist, Archiv) werden nicht erneut gescrapt.
+KA_INPUT_FILE = ""
