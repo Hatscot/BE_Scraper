@@ -10,9 +10,13 @@ OUTPUT_FILENAME = "LEGO_Ebay_Tracker_Result.xlsx"
 # Die Suchmuster, die auf eBay nacheinander ausgeführt werden, bis ein Preis gefunden wird
 # Verfügbare Platzhalter: {set_number}, {set_name}
 SEARCH_PATTERNS = [
-    "LEGO {set_number} OVP sealed",
+    "LEGO {set_number} OVP sealed misb",
+    "LEGO {set_number} {set_name} Neu sealed misb",
+    "LEGO {set_number} {set_name} Neu OVP misb",
     "LEGO {set_number} {set_name} Neu sealed",
     "LEGO {set_number} {set_name} Neu OVP",
+    "LEGO {set_number} {set_name} Neu",
+    "LEGO {set_number} OVP", 
 ]
 
 # --- Workflow Steuerung ---
@@ -89,6 +93,9 @@ BLACKLIST = [
     "Komplett",
     "komplett",
     "NEU in OVP",
+    "Zb",
+    "z.B",
+    
 ]
 
 # --- Beschreibungs-Blacklist ---
@@ -96,11 +103,64 @@ BLACKLIST = [
 # das Listing NICHT aufgenommen wird. Groß-/Kleinschreibung wird ignoriert.
 # Funktioniert identisch zur BLACKLIST, prüft aber den Beschreibungstext statt den Titel.
 DES_BLACKLIST = [
-    # "geöffnet",        # Bereits geöffnete Pakete
-    # "beschädigt",      # Beschädigte Verpackung
-    # "Kratzer",         # Sichtbare Mängel
-    # "fehlt",           # Fehlende Teile
-    # "unvollständig",   # Set nicht komplett
+     "geöffnet",        # Bereits geöffnete Pakete
+     "beschädigt",      # Beschädigte Verpackung
+     "Kratzer",         # Sichtbare Mängel
+     "fehlt",           # Fehlende Teile
+     "unvollständig",   # Set nicht komplett
+     "ohne OVP",
+     "ausgedruckter Anleitung",
+     "KEIN Original Karton",
+     "kein Original Karton",
+     "alle Teile vorhanden",
+     "auseinandergebaut",
+     "Ohne Anleitung",
+     "Gebrauchsspuren",
+     "gebrauchsspuren",
+     "bespielt",
+     "Gebraucht",
+     "gebraucht",
+     "inklusive Figuren",
+     "in sehr gutem Zustand",
+     "fast neu",
+     "fast wie neu",
+     "sehr gutem Zustand",
+     "sehr guten Zustand",
+     "Sehr guter Zustand",
+     "sehr guter Zustand",
+     "Sehr gutem Zustand",
+     "Sehr guten Zustand",
+     "Set ist vollständig",
+     "Es fehlt",
+     "sind gebraucht",
+     "Mit Figuren",
+     "100% vollständig",
+     "neuwertig",
+     "kein Originalkarton",
+     "gebrauchtes Set",
+     "Alle Teile vollständig",
+     "Set ist komplett",
+     "fehlende Teile",
+     "komplett",
+     "abgebrochen",
+     "nicht mehr ganz vollständig",
+     "nicht mehr ganz vollständig.",
+     "Alle Teile vorhanden.",
+     "Alle Teile vorhanden",
+     "Inkl. Bauanleitung und Verpackung",
+     "inkl. Bauanleitung und Verpackung",
+     "Inkl. Bauanleitung und Verpackung.",
+     "inkl. Bauanleitung und Verpackung.",
+     "Inkl. Bauanleitung",
+     "inkl. Bauanleitung",
+     "Inkl. Bauanleitung.",
+     "inkl. Bauanleitung.",
+     "inkl. Verpackung",
+     "Inkl. Verpackung",
+     "inkl. Verpackung.",
+     "Inkl. Verpackung.",
+     
+        
 ]
 
 # --- Kostenabzug & Margen-Schwellenwerte ---
@@ -127,7 +187,7 @@ MARGIN_THRESHOLD = [
 EXISTING_SHEET_ID = "DEINE_GOOGLE_SHEET_ID_HIER"
 
 # --- Kleinanzeigen-spezifische Einstellungen ---
-KA_OUTPUT_FILENAME = "LEGO_KA_Tracker_Result_07.xlsx"
+KA_OUTPUT_FILENAME = "LEGO_KA_Tracker_Result_08.xlsx"
 KA_ALLOWED_CURRENCIES = ["€"]
 
 # Pfad zu einer bestehenden KA-Ergebnis-Excel, die fortgeführt werden soll.
