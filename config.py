@@ -2,7 +2,7 @@
 
 # --- Einlese- & Dateipfade ---
 # Hier gibst du an, welche Tabelle als Basis für den Scrape dienen soll
-INPUT_FILE = "brickeconomy_sets_2026-04-06_10-20.xlsx" 
+INPUT_FILE = "brickeconomy_sets_2026-04-19_06-41.xlsx"
 # Name der Datei, die nach dem Scrape gespeichert/hochgeladen wird
 OUTPUT_FILENAME = "LEGO_Ebay_Tracker_Result.xlsx"
 
@@ -10,12 +10,9 @@ OUTPUT_FILENAME = "LEGO_Ebay_Tracker_Result.xlsx"
 # Die Suchmuster, die auf eBay nacheinander ausgeführt werden, bis ein Preis gefunden wird
 # Verfügbare Platzhalter: {set_number}, {set_name}
 SEARCH_PATTERNS = [
-    "LEGO {set_number} sealed",
-    "LEGO {set_number} {set_name} sealed",
-    "LEGO {set_name} sealed",
-    "LEGO {set_number} OVP",
-    "LEGO {set_number} {set_name} OVP",
-    "LEGO {set_name} OVP",
+    "LEGO {set_number} OVP sealed",
+    "LEGO {set_number} {set_name} Neu sealed",
+    "LEGO {set_number} {set_name} Neu OVP",
 ]
 
 # --- Workflow Steuerung ---
@@ -34,10 +31,19 @@ PROXY_MODE = True
 CONDITION_FILTER = "New"
 # Maximale aufeinanderfolgende Sets ohne Ergebnis, bevor der Scrape automatisch stoppt
 MAX_EMPTY_RESULTS = 250
-# Maximale Anzahl eBay-Angebote pro Set in der Ausgabe (günstigste zuerst, da _sop=15)
-MAX_RESULTS_PER_SET = 3
+# Maximale Anzahl Angebote pro Set in der Ausgabe (günstigste zuerst, da _sop=15)
+MAX_RESULTS_PER_SET = 50
+# True  = Begrenzung aktiv → maximal MAX_RESULTS_PER_SET Angebote pro Set
+# False = Alle gefundenen Angebote werden aufgenommen (MAX_RESULTS_PER_SET wird ignoriert)
+LIMIT_RESULTS_PER_SET = False
 # True = eBay-Artikeltitel muss die gesuchte Setnummer enthalten, sonst wird das Listing übersprungen
 SET_NUMBER_VERIFY = True
+
+# --- Scrapy Parallelitäts-Einstellungen (Kleinanzeigen) ---
+# Empfehlung: 2 / 1 / 3.0 als Startpunkt; aggressiver: 4 / 2 / 2.0
+KA_CONCURRENT_REQUESTS = 2
+KA_CONCURRENT_REQUESTS_PER_DOMAIN = 1
+KA_DOWNLOAD_DELAY = 3.0
 
 # --- Währungsfilter ---
 # Nur Listings in diesen Währungen werden aufgefasst.
@@ -65,19 +71,63 @@ BLACKLIST = [
     "LEGO Minifigur",
     "Schlüsselanhänger",
     "Kopfbedeckung",
-    "Spielsteine"
+    "Spielsteine",
     "mit OVP",
     "aufgebaut",
-
-
+    "OP",
+    "Anleitung",
+    "ohne OVP",
+    "inkl. OVP",
+    "ink. OVP",
+    "inkl OVP",
+    "Xingbao",
+    "incl.OVP",
+    "OBA",
+    "komplett vollständig "
+    "vollständig"
+    "BA",
+    "Komplett",
+    "komplett",
+    "NEU in OVP",
 ]
+
+# --- Beschreibungs-Blacklist ---
+# Wörter oder Sätze die im Beschreibungstext der Anzeige vorkommen dürfen, damit
+# das Listing NICHT aufgenommen wird. Groß-/Kleinschreibung wird ignoriert.
+# Funktioniert identisch zur BLACKLIST, prüft aber den Beschreibungstext statt den Titel.
+DES_BLACKLIST = [
+    # "geöffnet",        # Bereits geöffnete Pakete
+    # "beschädigt",      # Beschädigte Verpackung
+    # "Kratzer",         # Sichtbare Mängel
+    # "fehlt",           # Fehlende Teile
+    # "unvollständig",   # Set nicht komplett
+]
+
+# --- Kostenabzug & Margen-Schwellenwerte ---
+# B2C_MARGIN und LOGISTIC_COSTS werden multiplikativ vom Marktwert abgezogen:
+# Netto-Wert = Marktwert × (1 - B2C_MARGIN/100) × (1 - LOGISTIC_COSTS/100)
+B2C_MARGIN = 20      # Prozentuale B2C-Marge      (20 = 20%, Faktor 0.80)
+LOGISTIC_COSTS = 10  # Prozentuale Logistikkosten (10 = 10%, Faktor 0.90)
+
+# Marge-Schwellenwerte: [[min_Preis_€, min_Profit_%], ...]
+# Die höchste passende Stufe (KA-Preis >= Stufe) bestimmt den Mindest-Profit.
+# Liegt der Profit darunter → Listing wird nicht aufgeführt.
+# Erweiterbar: einfach weitere [Preis, Prozent]-Einträge hinzufügen.
+MARGIN_THRESHOLD = [
+    [0,    30],  # Unter 100€:  mind. 40% Profit nötig
+    [100,  25],  # Ab 100€:     mind. 30% Profit nötig
+    [1000, 8],  # Ab 1000€:    mind. 10% Profit nötig
+]
+
+
+
 
 # --- Google Sheets API ---
 # Falls CREATE_NEW_SHEET = False, hier die ID der vorhandenen Tabelle eintragen
 EXISTING_SHEET_ID = "DEINE_GOOGLE_SHEET_ID_HIER"
 
 # --- Kleinanzeigen-spezifische Einstellungen ---
-KA_OUTPUT_FILENAME = "LEGO_KA_Tracker_Result_02.xlsx"
+KA_OUTPUT_FILENAME = "LEGO_KA_Tracker_Result_07.xlsx"
 KA_ALLOWED_CURRENCIES = ["€"]
 
 # Pfad zu einer bestehenden KA-Ergebnis-Excel, die fortgeführt werden soll.

@@ -86,7 +86,7 @@ class EbayLegoSpider(scrapy.Spider):
             # Nur echte Artikel (mind. 9-stellige ID, kein Ghost-Placeholder)
             if link and re.search(r'/itm/\d{9,}', link):
                 found_links.append(link)
-                if len(found_links) >= config.MAX_RESULTS_PER_SET:
+                if config.LIMIT_RESULTS_PER_SET and len(found_links) >= config.MAX_RESULTS_PER_SET:
                     break
 
         if found_links:

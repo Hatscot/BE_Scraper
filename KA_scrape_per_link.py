@@ -6,23 +6,35 @@ import config
 import os
 import re
 import json
-import time
 from scrapy.exceptions import CloseSpider
 
 
-_MAX_403_RETRIES = 3   # Maximale Wiederholungsversuche bei HTTP 403
-_RETRY_WAIT_SEC   = 15  # Wartezeit in Sekunden vor jedem Retry (DataImpulse rotiert automatisch)
+_MAX_403_RETRIES = 2   # Maximale Wiederholungsversuche bei HTTP 403
 
 
 class KleinanzeigenLegoSpider(scrapy.Spider):
     name = "ka_lego"
     custom_settings = {
-        'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'DOWNLOAD_DELAY': 2.0,
-        'ROBOTSTXT_OBEY': False,
-        'LOG_LEVEL': 'INFO',
-        # 403 wird an die Callbacks weitergeleitet statt als Fehler abgebrochen
+        'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+
+        'CONCURRENT_REQUESTS':            config.KA_CONCURRENT_REQUESTS,
+        'CONCURRENT_REQUESTS_PER_DOMAIN': config.KA_CONCURRENT_REQUESTS_PER_DOMAIN,
+        'DOWNLOAD_DELAY':                 config.KA_DOWNLOAD_DELAY,
+        'RANDOMIZE_DOWNLOAD_DELAY':       True,
+
+        'AUTOTHROTTLE_ENABLED':            True,
+        'AUTOTHROTTLE_START_DELAY':        config.KA_DOWNLOAD_DELAY,
+        'AUTOTHROTTLE_MAX_DELAY':          30.0,
+        'AUTOTHROTTLE_TARGET_CONCURRENCY': config.KA_CONCURRENT_REQUESTS_PER_DOMAIN,
+
+        'RETRY_ENABLED':    True,
+        'RETRY_TIMES':      2,
+        'RETRY_HTTP_CODES': [],
+
+        'ROBOTSTXT_OBEY':          False,
+        'LOG_LEVEL':               'INFO',
         'HTTPERROR_ALLOWED_CODES': [403],
+        'COOKIES_ENABLED':         False,
     }
 
     def __init__(self, sets_df, spider_results, max_empty=250, *args, **kwargs):
@@ -64,19 +76,19 @@ class KleinanzeigenLegoSpider(scrapy.Spider):
         set_number = response.meta['set_number']
         set_name = response.meta['set_name']
 
-        # 403-Behandlung: DataImpulse rotiert automatisch bei neuer Verbindung
         if response.status == 403:
             retry_count = response.meta.get('_403_retries', 0)
             if retry_count < _MAX_403_RETRIES:
                 self.logger.warning(
-                    f"[403] Set {set_number} – Suchanfrage blockiert | "
-                    f"warte {_RETRY_WAIT_SEC}s, neuer Proxy (Versuch {retry_count + 1}/{_MAX_403_RETRIES})"
+                    f"[403] Set {set_number} – Suchanfrage blockiert, Re-Queue "
+                    f"(Versuch {retry_count + 1}/{_MAX_403_RETRIES})"
                 )
-                time.sleep(_RETRY_WAIT_SEC)
                 yield scrapy.Request(
                     url=response.url,
                     callback=self.parse,
-                    meta={**response.meta, '_403_retries': retry_count + 1, 'dont_filter': True}
+                    priority=-(retry_count + 1) * 2,
+                    dont_filter=True,
+                    meta={**response.meta, '_403_retries': retry_count + 1}
                 )
             else:
                 self.logger.warning(
@@ -114,7 +126,7 @@ class KleinanzeigenLegoSpider(scrapy.Spider):
             # Nur echte Anzeigen-Links (ID-Muster am Ende: XXXXXX-XX-XXXXX)
             if re.search(r'/s-anzeige/.+/\d+-\d+-\d+', href):
                 found_links.append(href)
-                if len(found_links) >= config.MAX_RESULTS_PER_SET:
+                if config.LIMIT_RESULTS_PER_SET and len(found_links) >= config.MAX_RESULTS_PER_SET:
                     break
 
         self.logger.info(f"[SEARCH] Items auf Seite: {len(response.css('article.aditem'))} | Valide Links: {len(found_links)}")
@@ -158,19 +170,19 @@ class KleinanzeigenLegoSpider(scrapy.Spider):
         row = response.meta['row']
         set_number = response.meta['set_number']
 
-        # 403-Behandlung: DataImpulse rotiert automatisch bei neuer Verbindung
         if response.status == 403:
             retry_count = response.meta.get('_403_retries', 0)
             if retry_count < _MAX_403_RETRIES:
                 self.logger.warning(
-                    f"[403] Set {set_number} – Anzeigenseite blockiert | "
-                    f"warte {_RETRY_WAIT_SEC}s, neuer Proxy (Versuch {retry_count + 1}/{_MAX_403_RETRIES})"
+                    f"[403] Set {set_number} – Anzeigenseite blockiert, Re-Queue "
+                    f"(Versuch {retry_count + 1}/{_MAX_403_RETRIES})"
                 )
-                time.sleep(_RETRY_WAIT_SEC)
                 yield scrapy.Request(
                     url=response.url,
                     callback=self.parse_item,
-                    meta={**response.meta, '_403_retries': retry_count + 1, 'dont_filter': True}
+                    priority=-(retry_count + 1) * 2,
+                    dont_filter=True,
+                    meta={**response.meta, '_403_retries': retry_count + 1}
                 )
             else:
                 self.logger.warning(
@@ -209,6 +221,30 @@ class KleinanzeigenLegoSpider(scrapy.Spider):
                 )
                 return
 
+        # Beschreibungs-Blacklist-Prüfung
+        if config.DES_BLACKLIST:
+            description = (
+                response.css('p#viewad-description-text::text').get()
+                or response.css('p#viewad-description-text *::text').getall()
+            )
+            if isinstance(description, list):
+                description = ' '.join(description)
+            description = (description or '').strip()
+
+            if description:
+                desc_lower = description.lower()
+                for word in config.DES_BLACKLIST:
+                    if word.lower() in desc_lower:
+                        self.logger.info(
+                            f"[ITEM] Set {set_number} → DES_BLACKLIST '{word}' "
+                            f"in Beschreibung – übersprungen"
+                        )
+                        return
+            else:
+                self.logger.debug(
+                    f"[ITEM] Set {set_number} → Keine Beschreibung gefunden (DES_BLACKLIST übersprungen)"
+                )
+
         price_val = None
 
         # Preis-Extraktion: adPrice-Variable aus eingebettetem JavaScript
@@ -233,7 +269,8 @@ class KleinanzeigenLegoSpider(scrapy.Spider):
         self.results.append({
             'row_data': row,
             'ka_price': price_val,
-            'ka_link': response.url
+            'ka_link': response.url,
+            'ka_title': title,
         })
 
 
@@ -336,7 +373,7 @@ def run_scraper():
     output_data = []
     for r in spider_results:
         row = dict(r['row_data'])
-        market_value_raw = str(row.get('Value (€)', '')).replace('$', '').replace(',', '')
+        market_value_raw = str(row.get('Value (€)', '')).replace('$', '').replace('€', '').replace(',', '').strip()
 
         try:
             market_value = float(market_value_raw) if market_value_raw.strip() else None
@@ -353,7 +390,13 @@ def run_scraper():
 
         if ka_price and market_value:
             try:
-                profit_eur = float(market_value) - float(ka_price)
+                # Netto-Marktwert nach Abzug von B2C-Marge und Logistikkosten
+                net_market_value = (
+                    float(market_value)
+                    * (1 - config.B2C_MARGIN / 100)
+                    * (1 - config.LOGISTIC_COSTS / 100)
+                )
+                profit_eur = net_market_value - float(ka_price)
                 if float(ka_price) > 0:
                     profit_pct = (profit_eur / float(ka_price)) * 100
             except ValueError:
@@ -362,6 +405,15 @@ def run_scraper():
         # Überspringen wenn nichts gefunden wurde
         if not r['ka_link'] and ka_price is None:
             continue
+
+        # Marge-Schwellenwert prüfen (nur bei numerischem Preis und bekanntem Profit)
+        if config.MARGIN_THRESHOLD and ka_price is not None and profit_pct is not None:
+            threshold_pct = None
+            for bracket in sorted(config.MARGIN_THRESHOLD, key=lambda x: x[0]):
+                if float(ka_price) >= bracket[0]:
+                    threshold_pct = bracket[1]
+            if threshold_pct is not None and profit_pct < threshold_pct:
+                continue  # unter Margen-Schwellenwert → nicht listen
 
         # Gefunden aber kein Preis (z.B. "VB" / Preis auf Anfrage)
         if r['ka_link'] and ka_price is None:
@@ -377,6 +429,7 @@ def run_scraper():
             'Set Gruppe': row.get('Set Gruppe', ''),
             'Set Nummer': row.get('Set Nummer', ''),
             'Set Name': str(set_name),
+            'Artikel Name': r.get('ka_title', ''),
             'Jahr': row.get('Jahr', ''),
             'Marktwert (€)': market_value,
             'KA Preis': ka_price,
