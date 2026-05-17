@@ -278,6 +278,11 @@ def parse_set_rows(soup: BeautifulSoup, theme_name: str) -> list[LegoSet]:
                 nummer = ""
                 name   = title_text
 
+            # Sets mit weniger als 4 Ziffern vor dem Bindestrich überspringen
+            leading_digits = nummer.split("-", 1)[0]
+            if len(leading_digits) < 4 or not leading_digits.isdigit():
+                continue
+
             # ── Jahr ──────────────────────────────────────────────────────────
             jahr = ""
             year_a = left_td.find("a", href=re.compile(r"/sets/year/(\d{4})"))

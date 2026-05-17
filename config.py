@@ -2,7 +2,7 @@
 
 # --- Einlese- & Dateipfade ---
 # Hier gibst du an, welche Tabelle als Basis für den Scrape dienen soll
-INPUT_FILE = "brickeconomy_sets_2026-04-19_06-41.xlsx"
+INPUT_FILE = "brickeconomy_sets_2026-05-11_13-35.xlsx"
 # Name der Datei, die nach dem Scrape gespeichert/hochgeladen wird
 OUTPUT_FILENAME = "LEGO_Ebay_Tracker_Result.xlsx"
 
@@ -87,15 +87,55 @@ BLACKLIST = [
     "Xingbao",
     "incl.OVP",
     "OBA",
-    "komplett vollständig "
-    "vollständig"
+    "komplett vollständig",
+    "vollständig",
     "BA",
     "Komplett",
     "komplett",
-    "NEU in OVP",
+    #"NEU in OVP",
     "Zb",
     "z.B",
-    
+    "in OVP",
+    "Neuwertig in OVP",
+    "neuwertig in OVP",
+    "inkl.OVP",
+    "gebraucht",
+    "BA",
+    # Zustandsbeschreibungen im Titel
+    "wie neu",
+    "Neuwertig",
+    "neuwertig",
+    "fast wie neu",
+    "fast neu",
+    "sehr guter Zustand",
+    "sehr gutem Zustand",
+    "guter Zustand",
+    "gutem Zustand",
+    # Schadhafte Verpackung
+    "Defekte OVP",
+    "defekte OVP",
+    "defekt",
+    "Defekt",
+    "beschädigt",
+    "Beschädigt",
+    # OVP-Varianten
+    "incl OVP",
+    # Leerkarton / Falschkategorisierung
+    "OVP zu LEGO",
+    "OVP zu Lego",
+    #"Karton zu", -- Brauchen wir nischte
+    "Schubladenbox",
+    "nicht OVP",
+    # Zeitschriften / Magazine (kein LEGO-Set, nur Druckwerk)
+    "Zeitschrift",
+    "Magazin",
+    # Gegenstände die nicht Lego sind
+    "Jeans",
+    "Hose",
+    "passend zu",
+    "Anleitung",
+    "anleitung",
+
 ]
 
 # --- Beschreibungs-Blacklist ---
@@ -130,6 +170,7 @@ DES_BLACKLIST = [
      "sehr guter Zustand",
      "Sehr gutem Zustand",
      "Sehr guten Zustand",
+     "gutem Zustand",
      "Set ist vollständig",
      "Es fehlt",
      "sind gebraucht",
@@ -159,6 +200,11 @@ DES_BLACKLIST = [
      "Inkl. Verpackung",
      "inkl. Verpackung.",
      "Inkl. Verpackung.",
+     "komplett",
+     "DEFEKT",
+     "DEFEKT.",
+    "Ersatzteile",
+
      
         
 ]
@@ -176,7 +222,9 @@ LOGISTIC_COSTS = 10  # Prozentuale Logistikkosten (10 = 10%, Faktor 0.90)
 MARGIN_THRESHOLD = [
     [0,    30],  # Unter 100€:  mind. 40% Profit nötig
     [100,  25],  # Ab 100€:     mind. 30% Profit nötig
-    [1000, 8],  # Ab 1000€:    mind. 10% Profit nötig
+    [250,  15],  # ab 250 Euronen ; 15 Prozent
+    [400,  10],  # ab 400 Euronen ; 10 Prozent
+    [600, 8],  # Ab 1000€:    mind. 10% Profit nötig
 ]
 
 
@@ -187,7 +235,7 @@ MARGIN_THRESHOLD = [
 EXISTING_SHEET_ID = "DEINE_GOOGLE_SHEET_ID_HIER"
 
 # --- Kleinanzeigen-spezifische Einstellungen ---
-KA_OUTPUT_FILENAME = "LEGO_KA_Tracker_Result_08.xlsx"
+KA_OUTPUT_FILENAME = "LEGO_KA_Tracker_Result_13.xlsx"
 KA_ALLOWED_CURRENCIES = ["€"]
 
 # Pfad zu einer bestehenden KA-Ergebnis-Excel, die fortgeführt werden soll.
@@ -196,3 +244,9 @@ KA_ALLOWED_CURRENCIES = ["€"]
 #                Kauf/Watchlist/Archiv/Löschen bleiben erhalten;
 #                bereits enthaltene Sets (aus Kauf, Watchlist, Archiv) werden nicht erneut gescrapt.
 KA_INPUT_FILE = ""
+
+# --- Operator Einstellungen ---
+# Anzahl der parallelen Spider-Prozesse die der Operator startet
+# Empfehlung: 2–4 für Datacenter-IPs; maximal 6–8 testen
+# Hat keine Wirkung wenn KA_scrape_per_link.py direkt (standalone) gestartet wird
+KA_NUM_SPIDERS = 4

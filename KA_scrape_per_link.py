@@ -207,7 +207,7 @@ class KleinanzeigenLegoSpider(scrapy.Spider):
         if config.BLACKLIST:
             title_lower = title.lower()
             for word in config.BLACKLIST:
-                if word.lower() in title_lower:
+                if word.strip().lower() in title_lower:
                     self.logger.info(
                         f"[ITEM] Set {set_number} → Blacklist '{word}' in Titel '{title[:60]}' – übersprungen"
                     )
@@ -215,11 +215,50 @@ class KleinanzeigenLegoSpider(scrapy.Spider):
 
         # Set-Nummer-Verifizierung: Titel muss die Setnummer als eigenständige Zahl enthalten
         if config.SET_NUMBER_VERIFY and set_number and title:
-            if not re.search(r'\b' + re.escape(str(set_number)) + r'\b', title):
+            numbers_in_title_raw = re.findall(r'\b(\d{3,})\b', title)
+
+            # Jahreszahlen (1900–2099) herausfiltern, damit sie keinen False Positive erzeugen.
+            # Ausnahme: Wenn die Set-Nummer selbst eine Jahreszahl ist (2017, 2018, ...), darf
+            # sie nicht weggefiltert werden – aber die "erste Zahl"-Prüfung unten greift dann.
+            year_pattern = re.compile(r'^(19|20)\d{2}$')
+            set_number_is_year = bool(year_pattern.match(str(set_number)))
+
+            if set_number_is_year:
+                numbers_in_title = numbers_in_title_raw
+            else:
+                numbers_in_title = [n for n in numbers_in_title_raw if not year_pattern.match(n)]
+
+            # Schritt 1: Set-Nummer muss in der bereinigten Liste vorkommen
+            if str(set_number) not in numbers_in_title:
                 self.logger.info(
                     f"[ITEM] Set {set_number} → Setnummer nicht im Titel '{title[:60]}' – übersprungen"
                 )
                 return
+
+            # Schritt 2: Multi-Set-Angebote überspringen (mehrere echte Set-Nummern >= 4 Stellen)
+            candidate_set_numbers = [
+                n for n in numbers_in_title_raw
+                if len(n) >= 4 and not year_pattern.match(n)
+            ]
+            if len(candidate_set_numbers) > 1:
+                self.logger.info(
+                    f"[ITEM] Set {set_number} → Mehrere Set-Nummern im Titel "
+                    f"({candidate_set_numbers}) – Multi-Set-Angebot, übersprungen | "
+                    f"Titel: '{title[:60]}'"
+                )
+                return
+
+            # Schritt 3: Bei kurzen Nummern (<4 Stellen) UND bei Jahreszahl-Nummern muss
+            # die Set-Nummer die ERSTE Zahl im Titel sein – sonst sind es Preise/Teilezahlen
+            # oder die Jahreszahl ist nur eine zufällige Erwähnung
+            if (len(str(set_number)) < 4 or set_number_is_year) and numbers_in_title_raw:
+                first_number = numbers_in_title_raw[0]
+                if first_number != str(set_number):
+                    self.logger.info(
+                        f"[ITEM] Set {set_number} → erste Zahl im Titel ist '{first_number}', "
+                        f"nicht '{set_number}' – übersprungen | Titel: '{title[:60]}'"
+                    )
+                    return
 
         # Beschreibungs-Blacklist-Prüfung
         if config.DES_BLACKLIST:
@@ -234,7 +273,7 @@ class KleinanzeigenLegoSpider(scrapy.Spider):
             if description:
                 desc_lower = description.lower()
                 for word in config.DES_BLACKLIST:
-                    if word.lower() in desc_lower:
+                    if word.strip().lower() in desc_lower:
                         self.logger.info(
                             f"[ITEM] Set {set_number} → DES_BLACKLIST '{word}' "
                             f"in Beschreibung – übersprungen"
@@ -274,7 +313,7 @@ class KleinanzeigenLegoSpider(scrapy.Spider):
         })
 
 
-def run_scraper():
+def run_scraper(spider_id=None, input_override=None, output_override=None):
     print("--- LEGO KLEINANZEIGEN ARBITER SCRAPER STARTED ---")
 
     # 0. Proxy Setup
@@ -304,7 +343,10 @@ def run_scraper():
             return
 
     # 1. Eingabe-Datei einlesen (dieselbe Liste wie EB-Scraper)
-    input_path = os.path.join('table', config.INPUT_FILE)
+    if input_override:
+        input_path = input_override
+    else:
+        input_path = os.path.join('table', config.INPUT_FILE)
     if not os.path.exists(input_path):
         print(f"Fehler: Datei {input_path} nicht gefunden!")
         return
@@ -323,9 +365,36 @@ def run_scraper():
         print(f"{polybag_count} Polybag-Sets übersprungen (Setnummern 30xxx).")
     input_df = input_df[~polybag_mask]
 
+    # Gruppen-Header-Zeilen (NaN/leer in Set Nummer) entfernen –
+    # sonst werden "LEGO nan"-Suchen abgeschickt, die den _consecutive_empty-Zähler hochtreiben
+    nan_mask = input_df['Set Nummer'].isna() | (input_df['Set Nummer'].astype(str).str.strip().isin(['', 'nan', 'NaN']))
+    nan_count = int(nan_mask.sum())
+    if nan_count > 0:
+        print(f"{nan_count} leere/NaN-Zeilen entfernt (Gruppen-Header der BrickEconomy-Excel).")
+    input_df = input_df[~nan_mask]
+
+    # Checkpoint-Logik (nur im Operator-Modus)
+    processed_urls = set()
+    if spider_id is not None:
+        checkpoint_path = os.path.join('ka_cache', f'spider_{spider_id}_checkpoint.json')
+        if os.path.exists(checkpoint_path):
+            try:
+                with open(checkpoint_path, 'r', encoding='utf-8') as f:
+                    checkpoint_data = json.load(f)
+                    processed_urls = set(checkpoint_data.get('processed_urls', []))
+                print(f"[Spider {spider_id}] Checkpoint geladen: {len(processed_urls)} Sets bereits verarbeitet")
+            except Exception as e:
+                print(f"[Spider {spider_id}] Checkpoint konnte nicht geladen werden: {e} – starte von vorne")
+                processed_urls = set()
+        else:
+            print(f"[Spider {spider_id}] Kein Checkpoint gefunden – starte von vorne")
+
     # 2. Merge-Logik (KA_INPUT_FILE steuert, ob bestehende Datei fortgeführt wird)
     already_processed_sets = set()
-    output_path = config.KA_OUTPUT_FILENAME
+    if output_override:
+        output_path = output_override
+    else:
+        output_path = config.KA_OUTPUT_FILENAME
 
     is_continuation = bool(config.KA_INPUT_FILE and config.KA_INPUT_FILE.strip())
     existing_file_path = config.KA_INPUT_FILE.strip() if is_continuation else None
@@ -349,6 +418,15 @@ def run_scraper():
 
     # Sets filtern
     to_scrape_df = input_df[~input_df['Set Nummer'].astype(str).isin(already_processed_sets)]
+
+    # Checkpoint-Sets aus to_scrape_df entfernen (Operator-Modus)
+    if spider_id is not None and processed_urls:
+        before = len(to_scrape_df)
+        to_scrape_df = to_scrape_df[
+            ~to_scrape_df['Set Nummer'].astype(str).isin(processed_urls)
+        ]
+        print(f"[Spider {spider_id}] {before - len(to_scrape_df)} Sets aus Checkpoint übersprungen, {len(to_scrape_df)} verbleiben")
+
     print(f"Starte Scrape für {len(to_scrape_df)} Sets...")
 
     if len(to_scrape_df) == 0:
@@ -368,6 +446,18 @@ def run_scraper():
     print(f"[DEBUG] spider_results: {len(spider_results)} Einträge nach Spider-Lauf")
     for r in spider_results[:3]:
         print(f"  → price={r['ka_price']} | link={str(r['ka_link'])[:70] if r['ka_link'] else 'None'}")
+
+    # Checkpoint nach erfolgreichem Lauf speichern (Operator-Modus)
+    if spider_id is not None:
+        checkpoint_path = os.path.join('ka_cache', f'spider_{spider_id}_checkpoint.json')
+        try:
+            done_sets = set(str(r['row_data']['Set Nummer']) for r in spider_results)
+            all_done = processed_urls | done_sets
+            with open(checkpoint_path, 'w', encoding='utf-8') as f:
+                json.dump({'processed_urls': list(all_done)}, f, ensure_ascii=False, indent=2)
+            print(f"[Spider {spider_id}] Checkpoint gespeichert: {len(all_done)} Sets als erledigt markiert")
+        except Exception as e:
+            print(f"[Spider {spider_id}] Checkpoint konnte nicht gespeichert werden: {e}")
 
     # 4. Resultate aggregieren
     output_data = []
@@ -445,9 +535,14 @@ def run_scraper():
         str(r.get('Set Nummer', '')).zfill(10)
     ))
 
-    # _ka_link aus output_data herausziehen
-    link_data = [{'ka_link': r.pop('_ka_link', None)} for r in output_data]
-    final_df = pd.DataFrame(output_data)
+    # _ka_link: im Operator-Modus als 'KA Link'-Spalte behalten (für Merge), sonst entfernen
+    if spider_id is not None:
+        final_df = pd.DataFrame(output_data)
+        final_df = final_df.rename(columns={'_ka_link': 'KA Link'})
+        link_data = [{'ka_link': v} for v in final_df['KA Link'].tolist()]
+    else:
+        link_data = [{'ka_link': r.pop('_ka_link', None)} for r in output_data]
+        final_df = pd.DataFrame(output_data)
 
     # 5. Speichern im Multi-Sheet Excel Format
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
@@ -480,4 +575,24 @@ def run_scraper():
 
 
 if __name__ == "__main__":
-    run_scraper()
+    import sys
+    # Standalone-Modus: python KA_scrape_per_link.py
+    # Operator-Modus:   python KA_scrape_per_link.py --spider-id 0
+    #                          --input ka_cache/spider_0_input.xlsx
+    #                          --output ka_cache/spider_0_results.xlsx
+    _spider_id = None
+    _input_override = None
+    _output_override = None
+
+    _args = sys.argv[1:]
+    if '--spider-id' in _args:
+        _idx = _args.index('--spider-id')
+        _spider_id = int(_args[_idx + 1])
+    if '--input' in _args:
+        _idx = _args.index('--input')
+        _input_override = _args[_idx + 1]
+    if '--output' in _args:
+        _idx = _args.index('--output')
+        _output_override = _args[_idx + 1]
+
+    run_scraper(spider_id=_spider_id, input_override=_input_override, output_override=_output_override)
